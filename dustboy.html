@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="th">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DustBoy 3D Cyber-Vision</title>
+    <!-- Google Fonts -->
+    <link
+        href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Prompt:wght@300;400;600&display=swap"
+        rel="stylesheet">
+    <!-- Scripts -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+    <style>
+        body,
+        html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background: #020617;
+            font-family: 'Prompt', sans-serif;
+            color: #fff;
+        }
+
+        #canvas-container {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        #overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 10;
+            background: radial-gradient(circle at center, transparent 0%, rgba(2, 6, 23, 0.4) 100%);
+            border: 20px solid transparent;
+            border-image: linear-gradient(to bottom right, #3b82f6, transparent, #ef4444) 1;
+        }
+
+        .hud-header {
+            position: absolute;
+            top: 30px;
+            left: 30px;
+            pointer-events: auto;
+        }
+
+        .hud-header h1 {
+            font-family: 'Orbitron', sans-serif;
+            margin: 0;
+            font-size: 2rem;
+            letter-spacing: 4px;
+            text-transform: uppercase;
+            color: #38bdf8;
+            text-shadow: 0 0 20px rgba(56, 189, 248, 0.5);
+        }
+
+        .hud-header p {
+            margin: 5px 0 0 0;
+            font-size: 0.9rem;
+            color: #94a3b8;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        .status-panel {
+            position: absolute;
+            bottom: 30px;
+            left: 30px;
+            background: rgba(15, 23, 42, 0.8);
+            backdrop-filter: blur(10px);
+            padding: 20px;
+            border-radius: 4px;
+            border-left: 4px solid #38bdf8;
+            pointer-events: auto;
+            min-width: 250px;
+        }
+
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+        }
+
+        .stat-label {
+            color: #64748b;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+        }
+
+        .stat-val {
+            color: #f8fafc;
+            font-weight: 600;
+            font-family: 'Orbitron';
+        }
+
+        #sensor-detail {
+            position: absolute;
+            top: 30px;
+            right: 30px;
+            background: rgba(15, 23, 42, 0.9);
+            backdrop-filter: blur(15px);
+            padding: 25px;
+            border-radius: 8px;
+            border: 1px solid rgba(56, 189, 248, 0.3);
+            pointer-events: auto;
+            width: 300px;
+            display: none;
+            box-shadow: 0 0 40px rgba(0, 0, 0, 0.5);
+            animation: slideIn 0.3s ease-out;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(50px);
+                opacity: 0;
+            }
+
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        .detail-title {
+            font-family: 'Orbitron';
+            font-size: 1.2rem;
+            color: #38bdf8;
+            margin-bottom: 15px;
+            border-bottom: 1px solid #334155;
+            padding-bottom: 10px;
+        }
+
+        .detail-pm {
+            font-size: 3rem;
+            font-weight: 800;
+            font-family: 'Orbitron';
+            color: #ef4444;
+            text-align: center;
+            margin: 10px 0;
+        }
+
+        .detail-pm span {
+            font-size: 1rem;
+            color: #94a3b8;
+        }
+
+        .btn-close {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: none;
+            border: none;
+            color: #64748b;
+            cursor: pointer;
+            font-size: 1.2rem;
+        }
+
+        .btn-close:hover {
+            color: #fff;
+        }
+
+        #loading-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #020617;
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .loader {
+            width: 100px;
+            height: 100px;
+            border: 4px solid #1e293b;
+            border-top: 4px solid #38bdf8;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 20px;
+        }
+
+        @keyframes spin {
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        /* Floating interaction hint */
+        #hint {
+            position: absolute;
+            bottom: 30px;
+            right: 30px;
+            color: #94a3b8;
+            font-size: 0.8rem;
+            letter-spacing: 1px;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="loading-screen">
+        <div class="loader"></div>
+        <div style="font-family: 'Orbitron'; letter-spacing: 5px; color: #38bdf8;">INITIALIZING CORE...</div>
+    </div>
+
+    <div id="overlay">
+        <div class="hud-header">
+            <h1>DustBoy 3D</h1>
+            <p>Holographic Air Quality Intelligence</p>
+        </div>
+
+        <div class="status-panel">
+            <div class="stat-row">
+                <span class="stat-label">System Status</span>
+                <span class="stat-val" id="sys-status" style="color: #ef4444;">OFFLINE</span>
+            </div>
+            <div class="stat-row">
+                <span class="stat-label">Active Sensors</span>
+                <span class="stat-val" id="active-count">0</span>
+            </div>
+            <div class="stat-row">
+                <span class="stat-label">MQTT Stream</span>
+                <span class="stat-val" id="mqtt-stream">---</span>
+            </div>
+        </div>
+
+        <div id="sensor-detail">
+            <button class="btn-close" onclick="closeDetail()">×</button>
+            <div class="detail-title" id="det-name">SENSOR_ID</div>
+            <div class="stat-label">Current PM2.5</div>
+            <div class="detail-pm" id="det-pm">00<span>µg/m³</span></div>
+            <div class="stat-row">
+                <span class="stat-label">PM10</span>
+                <span class="stat-val" id="det-pm10">0</span>
+            </div>
+            <div class="stat-row">
+                <span class="stat-label">Temperature</span>
+                <span class="stat-val" id="det-temp">0°C</span>
+            </div>
+            <div class="stat-row">
+                <span class="stat-label">Humidity</span>
+                <span class="stat-val" id="det-hum">0%</span>
+            </div>
+            <div style="font-size: 0.7rem; color: #475569; margin-top: 15px;" id="det-time">Last update: ---</div>
+        </div>
+
+        <div id="hint">MOUSE: ROTATE | CLICK: INSPECT</div>
+    </div>
+
+    <div id="canvas-container"></div>
+
+    <script>
+        // --- 3D Scene Setup ---
+        const container = document.getElementById('canvas-container');
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 5000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(window.devicePixelRatio);
+        container.appendChild(renderer.domElement);
+
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.autoRotate = true;
+        controls.autoRotateSpeed = 0.5;
+        camera.position.set(200, 150, 200);
+
+        // --- Lights ---
+        scene.add(new THREE.AmbientLight(0xffffff, 0.5));
+        const pointLight = new THREE.PointLight(0x38bdf8, 2, 500);
+        pointLight.position.set(0, 100, 0);
+        scene.add(pointLight);
+
+        // --- Holographic Floor Grid ---
+        const grid = new THREE.GridHelper(1000, 50, 0x38bdf8, 0x0f172a);
+        scene.add(grid);
+
+        // --- Particles (Dust Effect) ---
+        const partCount = 2000;
+        const partGeo = new THREE.BufferGeometry();
+        const partPos = new Float32Array(partCount * 3);
+        for (let i = 0; i < partCount * 3; i++) partPos[i] = (Math.random() - 0.5) * 1000;
+        partGeo.setAttribute('position', new THREE.BufferAttribute(partPos, 3));
+        const partMat = new THREE.PointsMaterial({ size: 2, color: 0x38bdf8, transparent: true, opacity: 0.5 });
+        const dust = new THREE.Points(partGeo, partMat);
+        scene.add(dust);
+
+        // --- Data Management ---
+        const sensors = new Map(); // sensorId -> {mesh, data}
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2();
+
+        // --- MQTT Connection ---
+        const brokerUrl = 'wss://dustboy-wss-bridge.laris.workers.dev/mqtt';
+        const client = mqtt.connect(brokerUrl);
+
+        client.on('connect', () => {
+            document.getElementById('sys-status').innerText = 'ONLINE';
+            document.getElementById('sys-status').style.color = '#22c55e';
+            client.subscribe('DUSTBOY/+/+/+/status');
+            document.getElementById('loading-screen').style.display = 'none';
+        });
+
+        client.on('message', (topic, message) => {
+            try {
+                const data = JSON.parse(message.toString());
+                const sensorId = data.nickname || data.id;
+                document.getElementById('mqtt-stream').innerText = topic.split('/').pop();
+                updateSensor(sensorId, data);
+            } catch (e) { console.error("Parse error", e); }
+        });
+
+        function getColor(pm25) {
+            if (pm25 <= 25) return 0x22c55e; // Good
+            if (pm25 <= 50) return 0xeab308; // Moderate
+            if (pm25 <= 100) return 0xf97316; // Unhealthy
+            return 0xef4444; // Emergency
+        }
+
+        function updateSensor(id, data) {
+            if (!sensors.has(id)) {
+                // Create New 3D Node
+                const group = new THREE.Group();
+                const geo = new THREE.CylinderGeometry(2, 5, 20, 4);
+                const mat = new THREE.MeshPhongMaterial({ color: 0x38bdf8, emissive: 0x38bdf8, emissiveIntensity: 0.5, transparent: true, opacity: 0.8 });
+                const mesh = new THREE.Mesh(geo, mat);
+                mesh.position.y = 10;
+                group.add(mesh);
+
+                // Floating Ring
+                const ringGeo = new THREE.TorusGeometry(8, 0.5, 16, 32);
+                const ringMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8 });
+                const ring = new THREE.Mesh(ringGeo, ringMat);
+                ring.rotation.x = Math.PI / 2;
+                group.add(ring);
+
+                // Random position within grid
+                group.position.set((Math.random() - 0.5) * 600, 0, (Math.random() - 0.5) * 600);
+                scene.add(group);
+                sensors.set(id, { group, mesh, ring, data });
+
+                document.getElementById('active-count').innerText = sensors.size;
+            }
+
+            const sensor = sensors.get(id);
+            sensor.data = data;
+            const pm25 = parseFloat(data.pm25) || 0;
+            const targetColor = getColor(pm25);
+
+            // Animate scale and color based on PM2.5
+            sensor.mesh.scale.set(1, 1 + (pm25 / 100), 1);
+            sensor.mesh.position.y = 10 * (1 + (pm25 / 100));
+            sensor.mesh.material.color.setHex(targetColor);
+            sensor.mesh.material.emissive.setHex(targetColor);
+            sensor.ring.material.color.setHex(targetColor);
+        }
+
+        // --- Interaction ---
+        window.addEventListener('click', (event) => {
+            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObjects(scene.children, true);
+
+            if (intersects.length > 0) {
+                let clickedGroup = intersects[0].object.parent;
+                for (let [id, sensor] of sensors) {
+                    if (sensor.group === clickedGroup) {
+                        showDetail(id, sensor.data);
+                        break;
+                    }
+                }
+            }
+        });
+
+        function showDetail(id, data) {
+            document.getElementById('sensor-detail').style.display = 'block';
+            document.getElementById('det-name').innerText = id;
+            document.getElementById('det-pm').innerHTML = `${data.pm25 || 0}<span>µg/m³</span>`;
+            document.getElementById('det-pm10').innerText = data.pm10 || 0;
+            document.getElementById('det-temp').innerText = `${data.temp || 0}°C`;
+            document.getElementById('det-hum').innerText = `${data.hum || 0}%`;
+            document.getElementById('det-time').innerText = `Last update: ${new Date().toLocaleTimeString()}`;
+
+            const color = '#' + getColor(data.pm25).toString(16).padStart(6, '0');
+            document.getElementById('det-pm').style.color = color;
+        }
+
+        function closeDetail() {
+            document.getElementById('sensor-detail').style.display = 'none';
+        }
+
+        // --- Animation Loop ---
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+
+            // Animating background elements
+            dust.rotation.y += 0.001;
+
+            sensors.forEach(s => {
+                s.group.position.y = Math.sin(Date.now() * 0.002) * 5;
+                s.ring.rotation.z += 0.02;
+            });
+
+            renderer.render(scene, camera);
+        }
+        animate();
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+    </script>
+</body>
+
+</html>
