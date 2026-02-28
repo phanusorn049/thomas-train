@@ -337,17 +337,25 @@
         }
 
         function getValue(obj, keys) {
+            // Check root first
             for (let key of keys) {
                 if (obj[key] !== undefined && obj[key] !== null) return obj[key];
+            }
+            // Check nested 'd' object (Model-N pattern)
+            if (obj.d) {
+                for (let key of keys) {
+                    if (obj.d[key] !== undefined && obj.d[key] !== null) return obj.d[key];
+                }
             }
             return 0;
         }
 
         function updateSensor(id, data) {
-            const pm25 = parseFloat(getValue(data, ['pm25', 'db_pm25', 'pm2_5'])) || 0;
+            // Field mapping matching soul-brews-studio reference
+            const pm25 = parseFloat(getValue(data, ['pm2_5', 'pm25', 'db_pm25'])) || 0;
             const pm10 = parseFloat(getValue(data, ['pm10', 'db_pm10'])) || 0;
-            const temp = parseFloat(getValue(data, ['temp', 'db_temp', 'temperature'])) || 0;
-            const hum = parseFloat(getValue(data, ['hum', 'db_hum', 'humidity'])) || 0;
+            const temp = parseFloat(getValue(data, ['temperature_c', 'temp_c', 'temp', 'db_temp'])) || 0;
+            const hum = parseFloat(getValue(data, ['humidity_rh', 'humid_rh', 'humid', 'db_hum'])) || 0;
 
             if (!sensors.has(id)) {
                 // Create New 3D Node
