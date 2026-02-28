@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="th">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Train Driver: CNX-PHS Simulator</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Prompt:wght@300;600&display=swap"
+        rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
+    <style>
+        body,
+        html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background: #000;
+            font-family: 'Prompt', sans-serif;
+        }
+
+        #canvas-container {
+            width: 100%;
+            height: 100%;
+        }
+
+        /* HUD UI */
+        #hud {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 10;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 20px;
+            box-sizing: border-box;
+            background: radial-gradient(circle at center, transparent 30%, rgba(0, 0, 0, 0.4) 100%);
+        }
+
+        .hud-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+        }
+
+        .hud-bottom {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+        }
+
+        .panel {
+            background: rgba(0, 20, 40, 0.7);
+            backdrop-filter: blur(10px);
+            padding: 15px 25px;
+            border-radius: 4px;
+            border-left: 4px solid #38bdf8;
+            pointer-events: auto;
+            color: #fff;
+            min-width: 200px;
+        }
+
+        .panel-label {
+            color: #38bdf8;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            font-weight: bold;
+        }
+
+        .panel-value {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 1.5rem;
+            margin-top: 5px;
+        }
+
+        .panel-desc {
+            font-size: 0.9rem;
+            color: #94a3b8;
+            margin-top: 5px;
+        }
+
+        #speed-gauge {
+            font-size: 3rem;
+            color: #f87171;
+            text-align: right;
+        }
+
+        #controls-hint {
+            position: absolute;
+            bottom: 100px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.5);
+            padding: 10px 20px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            color: #94a3b8;
+            letter-spacing: 1px;
+        }
+
+        #loading-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #020617;
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .spinner {
+            width: 60px;
+            height: 60px;
+            border: 4px solid #1e293b;
+            border-top: 4px solid #38bdf8;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 20px;
+        }
+
+        @keyframes spin {
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        /* Mobile Controls */
+        #mobile-btns {
+            display: none;
+            position: absolute;
+            bottom: 30px;
+            right: 30px;
+            gap: 10px;
+        }
+
+        .btn {
+            width: 70px;
+            height: 70px;
+            background: rgba(56, 189, 248, 0.3);
+            border: 2px solid #38bdf8;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            color: #fff;
+            cursor: pointer;
+            pointer-events: auto;
+        }
+
+        @media (max-width: 768px) {
+            #mobile-btns {
+                display: flex;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div id="loading-overlay">
+        <div class="spinner"></div>
+        <div style="font-family: 'Orbitron'; color: #38bdf8; letter-spacing: 4px;">SYNCING TRAIN DATA...</div>
+    </div>
+
+    <div id="hud">
+        <div class="hud-top">
+            <div class="panel">
+                <div class="panel-label">Current Location</div>
+                <div id="loc-name" class="panel-value">CNX DEPOT</div>
+                <div id="address" class="panel-desc">Initializing navigation...</div>
+            </div>
+            <div class="panel" style="text-align: right;">
+                <div class="panel-label">Train Speed</div>
+                <div id="speed-gauge" class="panel-value">000</div>
+                <div class="panel-desc">KILOMETERS PER HOUR</div>
+            </div>
+        </div>
+
+        <div id="controls-hint">W/UP: ACCELERATE | S/DOWN: BRAKE</div>
+
+        <div class="hud-bottom">
+            <div class="panel">
+                <div class="panel-label">Destination</div>
+                <div class="panel-value" style="color: #fca5a1;">PHS STATION</div>
+            </div>
+            <div id="mobile-btns">
+                <div class="btn" id="btn-up">▲</div>
+                <div class="btn" id="btn-down">▼</div>
+            </div>
+        </div>
+    </div>
+
+    <div id="canvas-container"></div>
+
+    <script>
+        // --- Configuration & State ---
+        const CSV_URL = 'https://raw.githubusercontent.com/Soul-Brews-Studio/two-rivers-oracle/main/%CF%88/lab/github-pages-workshop/travel-cnx-phs.csv';
+        let pathData = [];
+        let spline = null;
+        let trainPos = 0; // Progress 0 to 1
+        let currentSpeed = 0;
+        let targetSpeed = 0;
+        const MAX_SPEED = 0.0005; // Max speed increment per frame
+        const ACCEL = 0.000002;
+        const BRAKE = 0.000005;
+
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 10000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(window.devicePixelRatio);
+        document.getElementById('canvas-container').appendChild(renderer.domElement);
+
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        camera.position.set(20, 15, 30);
+
+        // --- Environment ---
+        scene.background = new THREE.Color(0x020617);
+        scene.fog = new THREE.FogExp2(0x020617, 0.002);
+
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
+        scene.add(ambientLight);
+        const sun = new THREE.DirectionalLight(0xffffff, 0.8);
+        sun.position.set(100, 200, 100);
+        scene.add(sun);
+
+        // Grid Floor
+        const grid = new THREE.GridHelper(5000, 100, 0x1e293b, 0x0f172a);
+        grid.position.y = -0.1;
+        scene.add(grid);
+
+        // --- Train Model ---
+        const trainGroup = new THREE.Group();
+        const bodyGeo = new THREE.BoxGeometry(4, 3, 10);
+        const bodyMat = new THREE.MeshPhongMaterial({ color: 0x3b82f6 });
+        const body = new THREE.Mesh(bodyGeo, bodyMat);
+        body.position.y = 1.5;
+        trainGroup.add(body);
+
+        // Cabin
+        const cabinGeo = new THREE.BoxGeometry(3.5, 2, 4);
+        const cabinMat = new THREE.MeshPhongMaterial({ color: 0x1e293b });
+        const cabin = new THREE.Mesh(cabinGeo, cabinMat);
+        cabin.position.set(0, 4, -2);
+        trainGroup.add(cabin);
+
+        // Headlight
+        const lightGeo = new THREE.CylinderGeometry(0.5, 0.5, 0.2, 32);
+        const lightMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+        const light = new THREE.Mesh(lightGeo, lightMat);
+        light.rotation.x = Math.PI / 2;
+        light.position.set(0, 1.5, 5);
+        trainGroup.add(light);
+
+        const spotLight = new THREE.SpotLight(0xffffff, 2, 100, 0.3);
+        spotLight.position.set(0, 1.5, 5);
+        spotLight.target.position.set(0, 0, 20);
+        trainGroup.add(spotLight);
+        trainGroup.add(spotLight.target);
+
+        scene.add(trainGroup);
+
+        // --- Data Loading ---
+        Papa.parse(CSV_URL, {
+            download: true,
+            header: true,
+            complete: function (results) {
+                pathData = results.data.filter(d => d.lat && d.lon);
+                initPath();
+                document.getElementById('loading-overlay').style.display = 'none';
+            }
+        });
+
+        const trackPoints = [];
+        const trackMeshes = [];
+
+        function initPath() {
+            const points = [];
+            // Use GPS to local coord conversion (simplified)
+            const originLat = parseFloat(pathData[0].lat);
+            const originLon = parseFloat(pathData[0].lon);
+            const scale = 5000; // Visual scale
+
+            pathData.forEach(d => {
+                const lat = parseFloat(d.lat);
+                const lon = parseFloat(d.lon);
+                const x = (lon - originLon) * scale;
+                const z = (originLat - lat) * scale;
+                points.push(new THREE.Vector3(x, 0, z));
+            });
+
+            spline = new THREE.CatmullRomCurve3(points);
+
+            // Initial Track Segment
+            const trackGeo = new THREE.BufferGeometry().setFromPoints(spline.getPoints(200));
+            const trackMat = new THREE.LineBasicMaterial({ color: 0x38bdf8, linewidth: 2 });
+            const line = new THREE.Line(trackGeo, trackMat);
+            scene.add(line);
+        }
+
+        // --- Game Logic ---
+        const keys = {};
+        window.addEventListener('keydown', (e) => keys[e.code] = true);
+        window.addEventListener('keyup', (e) => keys[e.code] = false);
+
+        // Mobile click support
+        document.getElementById('btn-up').addEventListener('mousedown', () => keys['KeyW'] = true);
+        document.getElementById('btn-up').addEventListener('mouseup', () => keys['KeyW'] = false);
+        document.getElementById('btn-down').addEventListener('mousedown', () => keys['KeyS'] = true);
+        document.getElementById('btn-down').addEventListener('mouseup', () => keys['KeyS'] = false);
+
+        function updateHUD(t) {
+            const index = Math.floor(t * (pathData.length - 1));
+            const data = pathData[index];
+            if (data) {
+                document.getElementById('loc-name').innerText = data.locality || "Unknown District";
+                document.getElementById('address').innerText = data.address || "Driving towards next check point...";
+            }
+            document.getElementById('speed-gauge').innerText = Math.round(currentSpeed * 200000).toString().padStart(3, '0');
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            if (spline) {
+                // Controls
+                if (keys['KeyW'] || keys['ArrowUp']) targetSpeed = MAX_SPEED;
+                else if (keys['KeyS'] || keys['ArrowDown']) targetSpeed = 0;
+
+                // Speed physics
+                if (currentSpeed < targetSpeed) currentSpeed = Math.min(targetSpeed, currentSpeed + ACCEL);
+                else if (currentSpeed > targetSpeed) currentSpeed = Math.max(0, currentSpeed - BRAKE);
+
+                trainPos += currentSpeed;
+                if (trainPos > 1) trainPos = 1;
+
+                // Move Train
+                const pos = spline.getPointAt(trainPos);
+                const lookAt = spline.getPointAt(Math.min(1, trainPos + 0.01));
+
+                trainGroup.position.copy(pos);
+                trainGroup.lookAt(lookAt);
+
+                // Update Camera (Third person follow)
+                const offset = new THREE.Vector3(0, 10, -25);
+                offset.applyQuaternion(trainGroup.quaternion);
+                camera.position.lerp(pos.clone().add(offset), 0.1);
+                controls.target.lerp(pos, 0.1);
+
+                updateHUD(trainPos);
+            }
+
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        animate();
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+    </script>
+</body>
+
+</html>
