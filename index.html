@@ -299,6 +299,14 @@
         sun.position.set(200, 1000, 200);
         scene.add(sun);
 
+        // Fallback data in case CSV fails
+        const fallbackData = [
+            { lat: 18.788, lon: 98.985, place: "เชียงใหม่ (เริ่มต้น)", updated: new Date().toISOString(), battery: 100 },
+            { lat: 18.358, lon: 99.245, place: "ลำปาง", updated: new Date().toISOString(), battery: 85 },
+            { lat: 17.618, lon: 100.098, place: "อุตรดิตถ์", updated: new Date().toISOString(), battery: 60 },
+            { lat: 16.823, lon: 100.262, place: "พิษณุโลก (ปลายทาง)", updated: new Date().toISOString(), battery: 40 }
+        ];
+
         const csvUrl = "https://raw.githubusercontent.com/Soul-Brews-Studio/two-rivers-oracle/main/%CF%88/lab/github-pages-workshop/travel-phitsanulok.csv";
         let pathCurve, train, coaches = [], waypoints = [], pathLen = 0;
         let isPlaying = false, progress = 0, isLocked = true, currentView = 'free';
@@ -312,52 +320,73 @@
             { name: "วัดใหญ่ (พิษณุโลก)", lat: 16.823, lon: 100.262, desc: "พระพุทธรูปที่งดงามที่สุดในไทย" }
         ];
 
+        function initScene(data) {
+            let minLat = Infinity, maxLat = -Infinity, minLon = Infinity, maxLon = -Infinity;
+            data.forEach(d => {
+                minLat = Math.min(minLat, d.lat); maxLat = Math.max(maxLat, d.lat);
+                minLon = Math.min(minLon, d.lon); maxLon = Math.max(maxLon, d.lon);
+            });
+            const centerLat = (minLat + maxLat) / 2, centerLon = (minLon + maxLon) / 2;
+            const points = [];
+            data.forEach(d => {
+                points.push(new THREE.Vector3((d.lon - centerLon) * scale, 0.5, -(d.lat - centerLat) * scale));
+                waypoints.push(d);
+            });
+            pathCurve = new THREE.CatmullRomCurve3(points);
+            pathLen = pathCurve.getLength();
+
+            const textureLoader = new THREE.TextureLoader();
+            const mapUrl = `https://static-maps.yandex.ru/1.x/?ll=${centerLon},${centerLat}&spn=0.8,0.8&l=sat&size=600,450`;
+            textureLoader.load(mapUrl, (texture) => {
+                const groundMat = new THREE.MeshPhongMaterial({ color: 0x4ade80, map: texture });
+                const mapWidth = (maxLon - minLon) * scale * 3.5, mapHeight = (maxLat - minLat) * scale * 3.5;
+                const ground = new THREE.Mesh(new THREE.PlaneGeometry(mapWidth, mapHeight), groundMat);
+                ground.rotation.x = -Math.PI / 2; ground.position.y = -0.1; scene.add(ground);
+
+                const startPos = pathCurve.getPointAt(0);
+                camera.position.set(startPos.x, 800, startPos.z + 800);
+                controls.target.copy(startPos);
+                document.getElementById('loading').style.display = 'none';
+                animate();
+            }, undefined, () => {
+                // Ground material without map if map fetch fails
+                const groundMat = new THREE.MeshPhongMaterial({ color: 0x4ade80 });
+                const mapWidth = (maxLon - minLon) * scale * 3.5, mapHeight = (maxLat - minLat) * scale * 3.5;
+                const ground = new THREE.Mesh(new THREE.PlaneGeometry(mapWidth, mapHeight), groundMat);
+                ground.rotation.x = -Math.PI / 2; ground.position.y = -0.1; scene.add(ground);
+
+                const startPos = pathCurve.getPointAt(0);
+                camera.position.set(startPos.x, 800, startPos.z + 800);
+                controls.target.copy(startPos);
+                document.getElementById('loading').style.display = 'none';
+                animate();
+            });
+
+            scene.add(new THREE.Mesh(new THREE.TubeGeometry(pathCurve, 2000, 0.5, 8, false), new THREE.MeshLambertMaterial({ color: 0x334155 })));
+            train = createThomas(); scene.add(train);
+            for (let i = 0; i < 3; i++) { coaches.push(createCoach(i)); scene.add(coaches[i]); }
+            landmarks.forEach(lm => {
+                const lmPos = new THREE.Vector3((lm.lon - centerLon) * scale, 0.5, -(lm.lat - centerLat) * scale);
+                const marker = new THREE.Group();
+                marker.add(new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 12), new THREE.MeshLambertMaterial({ color: 0xffffff })));
+                const flag = new THREE.Mesh(new THREE.BoxGeometry(5, 3, 0.5), new THREE.MeshLambertMaterial({ color: 0xeab308 }));
+                flag.position.set(2.5, 5, 0); marker.add(flag);
+                marker.position.copy(lmPos).setY(6); scene.add(marker);
+                lm.pos3d = lmPos; lm.hasTriggered = false;
+            });
+            for (let i = 0; i < 400; i++) addTree((maxLon - minLon) * scale * 3.5, (maxLat - minLat) * scale * 3.5);
+        }
+
         Papa.parse(csvUrl, {
             download: true, header: true, dynamicTyping: true,
             complete: function (results) {
                 const data = results.data.filter(d => d.lat && d.lon).sort((a, b) => new Date(a.updated) - new Date(b.updated));
-                let minLat = Infinity, maxLat = -Infinity, minLon = Infinity, maxLon = -Infinity;
-                data.forEach(d => {
-                    minLat = Math.min(minLat, d.lat); maxLat = Math.max(maxLat, d.lat);
-                    minLon = Math.min(minLon, d.lon); maxLon = Math.max(maxLon, d.lon);
-                });
-                const centerLat = (minLat + maxLat) / 2, centerLon = (minLon + maxLon) / 2;
-                const points = [];
-                data.forEach(d => {
-                    points.push(new THREE.Vector3((d.lon - centerLon) * scale, 0.5, -(d.lat - centerLat) * scale));
-                    waypoints.push(d);
-                });
-                pathCurve = new THREE.CatmullRomCurve3(points);
-                pathLen = pathCurve.getLength();
-
-                const textureLoader = new THREE.TextureLoader();
-                const mapUrl = `https://static-maps.yandex.ru/1.x/?ll=${centerLon},${centerLat}&spn=0.8,0.8&l=sat&size=600,450`;
-                textureLoader.load(mapUrl, (texture) => {
-                    const groundMat = new THREE.MeshPhongMaterial({ color: 0x4ade80, map: texture });
-                    const mapWidth = (maxLon - minLon) * scale * 3.5, mapHeight = (maxLat - minLat) * scale * 3.5;
-                    const ground = new THREE.Mesh(new THREE.PlaneGeometry(mapWidth, mapHeight), groundMat);
-                    ground.rotation.x = -Math.PI / 2; ground.position.y = -0.1; scene.add(ground);
-
-                    const startPos = pathCurve.getPointAt(0);
-                    camera.position.set(startPos.x, 800, startPos.z + 800);
-                    controls.target.copy(startPos);
-                    document.getElementById('loading').style.display = 'none';
-                    animate();
-                });
-
-                scene.add(new THREE.Mesh(new THREE.TubeGeometry(pathCurve, 2000, 0.5, 8, false), new THREE.MeshLambertMaterial({ color: 0x334155 })));
-                train = createThomas(); scene.add(train);
-                for (let i = 0; i < 3; i++) { coaches.push(createCoach(i)); scene.add(coaches[i]); }
-                landmarks.forEach(lm => {
-                    const lmPos = new THREE.Vector3((lm.lon - centerLon) * scale, 0.5, -(lm.lat - centerLat) * scale);
-                    const marker = new THREE.Group();
-                    marker.add(new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 12), new THREE.MeshLambertMaterial({ color: 0xffffff })));
-                    const flag = new THREE.Mesh(new THREE.BoxGeometry(5, 3, 0.5), new THREE.MeshLambertMaterial({ color: 0xeab308 }));
-                    flag.position.set(2.5, 5, 0); marker.add(flag);
-                    marker.position.copy(lmPos).setY(6); scene.add(marker);
-                    lm.pos3d = lmPos; lm.hasTriggered = false;
-                });
-                for (let i = 0; i < 400; i++) addTree((maxLon - minLon) * scale * 3.5, (maxLat - minLat) * scale * 3.5);
+                if (data.length > 0) initScene(data);
+                else initScene(fallbackData);
+            },
+            error: function () {
+                console.warn("CSV load failed, using fallback data.");
+                initScene(fallbackData);
             }
         });
 
@@ -469,9 +498,9 @@
                 });
 
                 const idx = Math.min(waypoints.length - 1, Math.floor(progress * waypoints.length));
-                document.getElementById('info-place').textContent = waypoints[idx].place || '-';
-                document.getElementById('info-time').textContent = new Date(waypoints[idx].updated).toLocaleTimeString();
-                document.getElementById('info-bat').textContent = `${waypoints[idx].battery}%`;
+                document.getElementById('info-place').textContent = (waypoints[idx] && waypoints[idx].place) ? waypoints[idx].place : '-';
+                document.getElementById('info-time').textContent = (waypoints[idx] && waypoints[idx].updated) ? new Date(waypoints[idx].updated).toLocaleTimeString() : '-';
+                document.getElementById('info-bat').textContent = (waypoints[idx] && waypoints[idx].battery) ? `${waypoints[idx].battery}%` : '-';
                 document.getElementById('progress-bar').style.width = (progress * 100) + '%';
             }
             controls.update();
