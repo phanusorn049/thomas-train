@@ -1,5 +1,6 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="th">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -223,27 +224,27 @@
 
 <body>
     <div id="loading">
-        <div style="color: #1d4ed8; font-size: 1.5rem; font-weight: 800;">?? ?????????????????????...</div>
+        <div style="color: #1d4ed8; font-size: 1.5rem; font-weight: 800;">🚂 กำลังโหลดระบบ Thomas (v.Final)...</div>
     </div>
 
     <div id="ui-layer">
-        <h1>?? Thomas Provincial Express</h1>
-        <p class="subtitle">?????????????? + ???????????</p>
+        <h1>🚂 Thomas Provincial Express</h1>
+        <p class="subtitle">มุมมองหลากหลาย + ควบคุมอิสระ</p>
 
-        <button id="btn-play">? ???????????? (Start)</button>
-        <button id="btn-lock" class="locked">?? ???????????????? (Locked)</button>
+        <button id="btn-play">▶ เริ่มเดินทาง (Start)</button>
+        <button id="btn-lock" class="locked">🔒 ล็อกกล้องที่รถไฟ (Locked)</button>
 
         <div class="view-grid" id="view-controls">
-            <button data-view="free" class="active">??? ?????</button>
-            <button data-view="bird">??? ????????</button>
-            <button data-view="diag">?? ????????</button>
-            <button data-view="driver">?? ??????????</button>
-            <button data-view="back">?? ??????????</button>
-            <button data-view="follow">?? ??????</button>
+            <button data-view="free" class="active">🖱️ อิสระ</button>
+            <button data-view="bird">🗺️ แผนที่บน</button>
+            <button data-view="diag">📐 มุมเฉียง</button>
+            <button data-view="driver">🔭 มองจากหน้า</button>
+            <button data-view="back">🔙 มองจากหลัง</button>
+            <button data-view="follow">🚁 บินตาม</button>
         </div>
 
         <div class="control-group">
-            <label>????????????: <span id="speed-val">0.1</span>x</label>
+            <label>ความเร็วขบวน: <span id="speed-val">0.1</span>x</label>
             <input type="range" id="speed-slider" min="0.1" max="5.0" step="0.1" value="0.1">
         </div>
 
@@ -252,24 +253,25 @@
         </div>
 
         <div class="info-panel">
-            <div><span class="label">???????:</span> <span class="val" id="info-place">-</span></div>
-            <div><span class="label">????:</span> <span class="val" id="info-time">-</span></div>
-            <div><span class="label">???:</span> <span class="val" id="info-bat">-</span></div>
+            <div><span class="label">สถานที่:</span> <span class="val" id="info-place">-</span></div>
+            <div><span class="label">เวลา:</span> <span class="val" id="info-time">-</span></div>
+            <div><span class="label">แบต:</span> <span class="val" id="info-bat">-</span></div>
         </div>
 
         <div class="cam-hint">
-            ?? ???????????????? ?????????????????<br>
-            ??????????????????????????????????
+            💡 คลิกปุ่มมุมต่างๆ เพื่อล็อกเป้าหมาย<br>
+            หรือหมุนเมาส์เพื่อกลับสู่โหมดอิสระ
         </div>
     </div>
 
     <div id="landmark-info">
-        <strong id="lm-title">?? Landmark!</strong><br>
+        <strong id="lm-title">📍 Landmark!</strong><br>
         <span id="lm-desc">...</span>
     </div>
 
     <div id="footer">
-        ?? ???????? <span class="footer-highlight">Antigravity Oracle</span> & <a href="mailto:phanusorn.p@psru.ac.th" style="color: #1d4ed8; text-decoration: none;">phanusorn.p@psru.ac.th</a>
+        🤖 พัฒนาโดย <span class="footer-highlight">Antigravity Oracle</span> & <a href="mailto:phanusorn.p@psru.ac.th"
+            style="color: #1d4ed8; text-decoration: none;">phanusorn.p@psru.ac.th</a>
     </div>
 
     <div id="canvas-container"></div>
@@ -305,9 +307,9 @@
         const engineLength = 8.5, coachLength = 8.0, gap = 0.5;
 
         const landmarks = [
-            { name: "????????????? (?????????)", lat: 18.786, lon: 98.986, desc: "???????????????????????????? ?????????????????????" },
-            { name: "???????????????????? (?????)", lat: 18.358, lon: 99.245, desc: "???????????????????????????????????????" },
-            { name: "??????? (????????)", lat: 16.823, lon: 100.262, desc: "?????????????????????????????" }
+            { name: "วัดเจดีย์หลวง (เชียงใหม่)", lat: 18.786, lon: 98.986, desc: "วัดโบราณใจกลางเมืองเชียงใหม่ จุดเริ่มต้นการเดินทาง" },
+            { name: "ศูนย์อนุรักษ์ช้างไทย (ลำปาง)", lat: 18.358, lon: 99.245, desc: "ศูนย์ช้างแห่งแรกและแห่งเดียวของรัฐในไทย" },
+            { name: "วัดใหญ่ (พิษณุโลก)", lat: 16.823, lon: 100.262, desc: "พระพุทธรูปที่งดงามที่สุดในไทย" }
         ];
 
         Papa.parse(csvUrl, {
@@ -329,7 +331,7 @@
                 pathLen = pathCurve.getLength();
 
                 const textureLoader = new THREE.TextureLoader();
-                const mapUrl = https://static-maps.yandex.ru/1.x/?ll=,&spn=0.8,0.8&l=sat&size=600,450;
+                const mapUrl = `https://static-maps.yandex.ru/1.x/?ll=${centerLon},${centerLat}&spn=0.8,0.8&l=sat&size=600,450`;
                 textureLoader.load(mapUrl, (texture) => {
                     const groundMat = new THREE.MeshPhongMaterial({ color: 0x4ade80, map: texture });
                     const mapWidth = (maxLon - minLon) * scale * 3.5, mapHeight = (maxLat - minLat) * scale * 3.5;
@@ -391,10 +393,10 @@
         }
 
         const btnPlay = document.getElementById('btn-play');
-        btnPlay.onclick = () => { isPlaying = !isPlaying; btnPlay.textContent = isPlaying ? '? ???? (Pause)' : '? ????? (Start)'; if (progress >= 0.99) progress = 0; };
+        btnPlay.onclick = () => { isPlaying = !isPlaying; btnPlay.textContent = isPlaying ? '⏸ หยุด (Pause)' : '▶ เริ่ม (Start)'; if (progress >= 0.99) progress = 0; };
 
         const btnLock = document.getElementById('btn-lock');
-        btnLock.onclick = () => { isLocked = !isLocked; btnLock.textContent = isLocked ? '?? ???????????????? (Locked)' : '?? ???????????? (Free)'; btnLock.className = isLocked ? 'locked' : ''; if (!isLocked) { currentView = 'free'; updateViewButtons(); } };
+        btnLock.onclick = () => { isLocked = !isLocked; btnLock.textContent = isLocked ? '🔒 ล็อกกล้องที่รถไฟ (Locked)' : '🔓 ปลดล็อกกล้อง (Free)'; btnLock.className = isLocked ? 'locked' : ''; if (!isLocked) { currentView = 'free'; updateViewButtons(); } };
 
         document.querySelectorAll('#view-controls button').forEach(btn => {
             btn.onclick = () => {
@@ -402,7 +404,7 @@
                 updateViewButtons();
                 if (currentView !== 'free') {
                     isLocked = true;
-                    btnLock.textContent = '?? ???????????????? (Locked)';
+                    btnLock.textContent = '🔒 ล็อกกล้องที่รถไฟ (Locked)';
                     btnLock.className = 'locked';
                 }
             };
@@ -469,7 +471,7 @@
                 const idx = Math.min(waypoints.length - 1, Math.floor(progress * waypoints.length));
                 document.getElementById('info-place').textContent = waypoints[idx].place || '-';
                 document.getElementById('info-time').textContent = new Date(waypoints[idx].updated).toLocaleTimeString();
-                document.getElementById('info-bat').textContent = ${waypoints[idx].battery}%;
+                document.getElementById('info-bat').textContent = `${waypoints[idx].battery}%`;
                 document.getElementById('progress-bar').style.width = (progress * 100) + '%';
             }
             controls.update();
@@ -477,6 +479,5 @@
         }
     </script>
 </body>
+
 </html>
-< ! - -   R e - d e p l o y   t r i g g e r   - - >  
- 
