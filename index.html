@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Thomas - Multi-View Explorer</title>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;800&display=swap" rel="stylesheet">
+    <style>
+        body,
+        html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #87CEEB;
+            font-family: 'Prompt', sans-serif;
+            color: #1e293b;
+        }
+
+        #canvas-container {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        #ui-layer {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 10;
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(10px);
+            padding: 20px;
+            border-radius: 12px;
+            max-width: 340px;
+            width: 100%;
+            border: 3px solid #3b82f6;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+        }
+
+        h1 {
+            margin: 0 0 5px 0;
+            font-size: 1.4rem;
+            color: #1d4ed8;
+        }
+
+        p.subtitle {
+            margin: 0 0 10px 0;
+            font-size: 0.85rem;
+            color: #475569;
+        }
+
+        button {
+            background: #f1f5f9;
+            color: #1e293b;
+            border: 1px solid #cbd5e1;
+            padding: 8px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-family: 'Prompt', sans-serif;
+            font-size: 0.85rem;
+            transition: all 0.2s;
+        }
+
+        button:hover {
+            background: #e2e8f0;
+            border-color: #3b82f6;
+        }
+
+        button.active {
+            background: #3b82f6;
+            color: #fff;
+            border-color: #2563eb;
+            font-weight: bold;
+        }
+
+        #btn-play {
+            background: #22c55e;
+            color: white;
+            border: none;
+            font-weight: bold;
+            font-size: 1.1rem;
+            width: 100%;
+            margin-bottom: 10px;
+            padding: 12px;
+        }
+
+        #btn-play.playing {
+            background: #f59e0b;
+        }
+
+        #btn-lock {
+            background: #6366f1;
+            color: white;
+            border: none;
+            width: 100%;
+            margin-bottom: 10px;
+            padding: 10px;
+            font-weight: 500;
+        }
+
+        #btn-lock.locked {
+            background: #ef4444;
+        }
+
+        .view-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 6px;
+            margin-bottom: 15px;
+        }
+
+        .control-group {
+            margin-bottom: 15px;
+        }
+
+        .control-group label {
+            display: block;
+            font-size: 0.8rem;
+            color: #64748b;
+            margin-bottom: 5px;
+        }
+
+        input[type=range] {
+            width: 100%;
+            cursor: pointer;
+        }
+
+        .info-panel {
+            padding-top: 15px;
+            border-top: 1px solid #e2e8f0;
+            font-size: 0.9rem;
+            line-height: 1.6;
+        }
+
+        .info-panel .label {
+            color: #64748b;
+            display: inline-block;
+            width: 70px;
+        }
+
+        .info-panel .val {
+            color: #1d4ed8;
+            font-weight: 500;
+        }
+
+        #progress-container {
+            width: 100%;
+            height: 8px;
+            background: #e2e8f0;
+            border-radius: 4px;
+            margin-bottom: 15px;
+            overflow: hidden;
+        }
+
+        #progress-bar {
+            height: 100%;
+            background: #3b82f6;
+            width: 0%;
+        }
+
+        .cam-hint {
+            margin-top: 10px;
+            font-size: 0.75rem;
+            color: #64748b;
+            font-style: italic;
+            background: #f8fafc;
+            padding: 8px;
+            border-radius: 6px;
+        }
+
+        #landmark-info {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            z-index: 10;
+            background: rgba(255, 230, 0, 0.95);
+            padding: 15px 20px;
+            border-radius: 12px;
+            max-width: 250px;
+            font-size: 0.9rem;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            border: 2px solid #eab308;
+            display: none;
+        }
+
+        #footer {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            z-index: 10;
+            background: rgba(255, 255, 255, 0.8);
+            padding: 8px 15px;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            color: #475569;
+            backdrop-filter: blur(5px);
+            border: 1px solid #cbd5e1;
+        }
+
+        .footer-highlight {
+            color: #1d4ed8;
+            font-weight: 600;
+        }
+
+        #loading {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #87CEEB;
+            z-index: 2000;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="loading">
+        <div style="color: #1d4ed8; font-size: 1.5rem; font-weight: 800;">?? ?????????????????????...</div>
+    </div>
+
+    <div id="ui-layer">
+        <h1>?? Thomas Provincial Express</h1>
+        <p class="subtitle">?????????????? + ???????????</p>
+
+        <button id="btn-play">? ???????????? (Start)</button>
+        <button id="btn-lock" class="locked">?? ???????????????? (Locked)</button>
+
+        <div class="view-grid" id="view-controls">
+            <button data-view="free" class="active">??? ?????</button>
+            <button data-view="bird">??? ????????</button>
+            <button data-view="diag">?? ????????</button>
+            <button data-view="driver">?? ??????????</button>
+            <button data-view="back">?? ??????????</button>
+            <button data-view="follow">?? ??????</button>
+        </div>
+
+        <div class="control-group">
+            <label>????????????: <span id="speed-val">0.1</span>x</label>
+            <input type="range" id="speed-slider" min="0.1" max="5.0" step="0.1" value="0.1">
+        </div>
+
+        <div id="progress-container">
+            <div id="progress-bar"></div>
+        </div>
+
+        <div class="info-panel">
+            <div><span class="label">???????:</span> <span class="val" id="info-place">-</span></div>
+            <div><span class="label">????:</span> <span class="val" id="info-time">-</span></div>
+            <div><span class="label">???:</span> <span class="val" id="info-bat">-</span></div>
+        </div>
+
+        <div class="cam-hint">
+            ?? ???????????????? ?????????????????<br>
+            ??????????????????????????????????
+        </div>
+    </div>
+
+    <div id="landmark-info">
+        <strong id="lm-title">?? Landmark!</strong><br>
+        <span id="lm-desc">...</span>
+    </div>
+
+    <div id="footer">
+        ?? ???????? <span class="footer-highlight">Antigravity Oracle</span> & <a href="mailto:phanusorn.p@psru.ac.th" style="color: #1d4ed8; text-decoration: none;">phanusorn.p@psru.ac.th</a>
+    </div>
+
+    <div id="canvas-container"></div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+
+    <script>
+        const container = document.getElementById('canvas-container');
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x87CEEB);
+        const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 80000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(window.devicePixelRatio);
+        container.appendChild(renderer.domElement);
+
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+
+        scene.add(new THREE.AmbientLight(0xffffff, 1.2));
+        const sun = new THREE.DirectionalLight(0xffffff, 0.8);
+        sun.position.set(200, 1000, 200);
+        scene.add(sun);
+
+        const csvUrl = "https://raw.githubusercontent.com/Soul-Brews-Studio/two-rivers-oracle/main/%CF%88/lab/github-pages-workshop/travel-phitsanulok.csv";
+        let pathCurve, train, coaches = [], waypoints = [], pathLen = 0;
+        let isPlaying = false, progress = 0, isLocked = true, currentView = 'free';
+        let baseSpeed = 0.0006, speedMultiplier = 0.1;
+        const scale = 12000;
+        const engineLength = 8.5, coachLength = 8.0, gap = 0.5;
+
+        const landmarks = [
+            { name: "????????????? (?????????)", lat: 18.786, lon: 98.986, desc: "???????????????????????????? ?????????????????????" },
+            { name: "???????????????????? (?????)", lat: 18.358, lon: 99.245, desc: "???????????????????????????????????????" },
+            { name: "??????? (????????)", lat: 16.823, lon: 100.262, desc: "?????????????????????????????" }
+        ];
+
+        Papa.parse(csvUrl, {
+            download: true, header: true, dynamicTyping: true,
+            complete: function (results) {
+                const data = results.data.filter(d => d.lat && d.lon).sort((a, b) => new Date(a.updated) - new Date(b.updated));
+                let minLat = Infinity, maxLat = -Infinity, minLon = Infinity, maxLon = -Infinity;
+                data.forEach(d => {
+                    minLat = Math.min(minLat, d.lat); maxLat = Math.max(maxLat, d.lat);
+                    minLon = Math.min(minLon, d.lon); maxLon = Math.max(maxLon, d.lon);
+                });
+                const centerLat = (minLat + maxLat) / 2, centerLon = (minLon + maxLon) / 2;
+                const points = [];
+                data.forEach(d => {
+                    points.push(new THREE.Vector3((d.lon - centerLon) * scale, 0.5, -(d.lat - centerLat) * scale));
+                    waypoints.push(d);
+                });
+                pathCurve = new THREE.CatmullRomCurve3(points);
+                pathLen = pathCurve.getLength();
+
+                const textureLoader = new THREE.TextureLoader();
+                const mapUrl = https://static-maps.yandex.ru/1.x/?ll=,&spn=0.8,0.8&l=sat&size=600,450;
+                textureLoader.load(mapUrl, (texture) => {
+                    const groundMat = new THREE.MeshPhongMaterial({ color: 0x4ade80, map: texture });
+                    const mapWidth = (maxLon - minLon) * scale * 3.5, mapHeight = (maxLat - minLat) * scale * 3.5;
+                    const ground = new THREE.Mesh(new THREE.PlaneGeometry(mapWidth, mapHeight), groundMat);
+                    ground.rotation.x = -Math.PI / 2; ground.position.y = -0.1; scene.add(ground);
+
+                    const startPos = pathCurve.getPointAt(0);
+                    camera.position.set(startPos.x, 800, startPos.z + 800);
+                    controls.target.copy(startPos);
+                    document.getElementById('loading').style.display = 'none';
+                    animate();
+                });
+
+                scene.add(new THREE.Mesh(new THREE.TubeGeometry(pathCurve, 2000, 0.5, 8, false), new THREE.MeshLambertMaterial({ color: 0x334155 })));
+                train = createThomas(); scene.add(train);
+                for (let i = 0; i < 3; i++) { coaches.push(createCoach(i)); scene.add(coaches[i]); }
+                landmarks.forEach(lm => {
+                    const lmPos = new THREE.Vector3((lm.lon - centerLon) * scale, 0.5, -(lm.lat - centerLat) * scale);
+                    const marker = new THREE.Group();
+                    marker.add(new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 12), new THREE.MeshLambertMaterial({ color: 0xffffff })));
+                    const flag = new THREE.Mesh(new THREE.BoxGeometry(5, 3, 0.5), new THREE.MeshLambertMaterial({ color: 0xeab308 }));
+                    flag.position.set(2.5, 5, 0); marker.add(flag);
+                    marker.position.copy(lmPos).setY(6); scene.add(marker);
+                    lm.pos3d = lmPos; lm.hasTriggered = false;
+                });
+                for (let i = 0; i < 400; i++) addTree((maxLon - minLon) * scale * 3.5, (maxLat - minLat) * scale * 3.5);
+            }
+        });
+
+        function addTree(w, h) {
+            const group = new THREE.Group();
+            group.add(new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.7, 5), new THREE.MeshLambertMaterial({ color: 0x78350f })));
+            const leaves = new THREE.Mesh(new THREE.ConeGeometry(4, 10, 8), new THREE.MeshLambertMaterial({ color: 0x15803d }));
+            leaves.position.y = 5; group.add(leaves);
+            group.position.set((Math.random() - 0.5) * w, 2.5, (Math.random() - 0.5) * h);
+            group.scale.set(0.4, 0.4, 0.4); scene.add(group);
+        }
+
+        function createThomas() {
+            const group = new THREE.Group();
+            const body = new THREE.Mesh(new THREE.BoxGeometry(4, 3, 8), new THREE.MeshLambertMaterial({ color: 0x0ea5e9 }));
+            body.position.y = 3; group.add(body);
+            const boiler = new THREE.Mesh(new THREE.CylinderGeometry(1.8, 1.8, 6), new THREE.MeshLambertMaterial({ color: 0x0ea5e9 }));
+            boiler.rotation.x = Math.PI / 2; boiler.position.set(0, 3.5, 1); group.add(boiler);
+            const face = new THREE.Mesh(new THREE.CylinderGeometry(1.8, 1.8, 0.5), new THREE.MeshLambertMaterial({ color: 0xe5e7eb }));
+            face.rotation.x = Math.PI / 2; face.position.set(0, 3.5, 4.1); group.add(face);
+            const base = new THREE.Mesh(new THREE.BoxGeometry(4.5, 1, 9), new THREE.MeshLambertMaterial({ color: 0xef4444 }));
+            base.position.y = 1.5; group.add(base);
+            return group;
+        }
+
+        function createCoach(id) {
+            const group = new THREE.Group();
+            const body = new THREE.Mesh(new THREE.BoxGeometry(4, 3.5, 7.5), new THREE.MeshLambertMaterial({ color: id % 2 === 0 ? 0xf59e0b : 0x06b6d4 }));
+            body.position.y = 3.2; group.add(body);
+            const base = new THREE.Mesh(new THREE.BoxGeometry(4.2, 0.8, 8.5), new THREE.MeshLambertMaterial({ color: 0x334155 }));
+            base.position.y = 1.6; group.add(base);
+            return group;
+        }
+
+        const btnPlay = document.getElementById('btn-play');
+        btnPlay.onclick = () => { isPlaying = !isPlaying; btnPlay.textContent = isPlaying ? '? ???? (Pause)' : '? ????? (Start)'; if (progress >= 0.99) progress = 0; };
+
+        const btnLock = document.getElementById('btn-lock');
+        btnLock.onclick = () => { isLocked = !isLocked; btnLock.textContent = isLocked ? '?? ???????????????? (Locked)' : '?? ???????????? (Free)'; btnLock.className = isLocked ? 'locked' : ''; if (!isLocked) { currentView = 'free'; updateViewButtons(); } };
+
+        document.querySelectorAll('#view-controls button').forEach(btn => {
+            btn.onclick = () => {
+                currentView = btn.dataset.view;
+                updateViewButtons();
+                if (currentView !== 'free') {
+                    isLocked = true;
+                    btnLock.textContent = '?? ???????????????? (Locked)';
+                    btnLock.className = 'locked';
+                }
+            };
+        });
+
+        function updateViewButtons() {
+            document.querySelectorAll('#view-controls button').forEach(b => {
+                b.classList.toggle('active', b.dataset.view === currentView);
+            });
+        }
+
+        const speedSlider = document.getElementById('speed-slider');
+        speedSlider.oninput = () => { speedMultiplier = parseFloat(speedSlider.value); document.getElementById('speed-val').textContent = speedMultiplier.toFixed(1); };
+
+        function showLandmarkPopup(title, desc) {
+            const el = document.getElementById('landmark-info');
+            document.getElementById('lm-title').textContent = title; document.getElementById('lm-desc').textContent = desc;
+            el.style.display = 'block'; setTimeout(() => { el.style.display = 'none'; }, 6000);
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            if (isPlaying && pathCurve) {
+                progress += baseSpeed * speedMultiplier;
+                if (progress >= 1) { progress = 1; isPlaying = false; }
+            }
+
+            if (pathCurve) {
+                const pos = pathCurve.getPointAt(progress);
+                const tan = pathCurve.getTangentAt(progress).normalize();
+                train.position.copy(pos); train.lookAt(pos.clone().add(tan));
+
+                let cProg = progress;
+                coaches.forEach((coach, i) => {
+                    cProg -= ((i === 0 ? engineLength / 2 + coachLength / 2 : coachLength) + gap) / pathLen;
+                    if (cProg >= 0) {
+                        const cp = pathCurve.getPointAt(cProg), ct = pathCurve.getTangentAt(cProg).normalize();
+                        coach.position.copy(cp); coach.lookAt(cp.clone().add(ct)); coach.visible = true;
+                    } else coach.visible = false;
+                });
+
+                if (isLocked) {
+                    controls.target.lerp(pos, 0.1);
+                    if (currentView !== 'free') {
+                        let tCam = new THREE.Vector3();
+                        if (currentView === 'driver') tCam.copy(pos).add(tan.clone().multiplyScalar(10)).setY(pos.y + 6);
+                        else if (currentView === 'bird') tCam.copy(pos).setY(1500);
+                        else if (currentView === 'diag') tCam.copy(pos).add(new THREE.Vector3(0, 1, 0).cross(tan).multiplyScalar(100)).add(tan.clone().multiplyScalar(-100)).setY(100);
+                        else if (currentView === 'back') {
+                            const lastProg = progress - (3.5 * (coachLength + gap) / pathLen);
+                            const lp = pathCurve.getPointAt(Math.max(0, lastProg)), lt = pathCurve.getTangentAt(Math.max(0, lastProg));
+                            tCam.copy(lp).add(lt.clone().multiplyScalar(-30)).setY(15);
+                        } else if (currentView === 'follow') tCam.copy(pos).add(tan.clone().multiplyScalar(-150)).setY(80);
+                        camera.position.lerp(tCam, 0.05);
+                    }
+                }
+
+                landmarks.forEach(lm => {
+                    const dist = pos.distanceTo(lm.pos3d);
+                    if (dist < 40 && !lm.hasTriggered) { lm.hasTriggered = true; showLandmarkPopup(lm.name, lm.desc); }
+                    else if (dist > 150) lm.hasTriggered = false;
+                });
+
+                const idx = Math.min(waypoints.length - 1, Math.floor(progress * waypoints.length));
+                document.getElementById('info-place').textContent = waypoints[idx].place || '-';
+                document.getElementById('info-time').textContent = new Date(waypoints[idx].updated).toLocaleTimeString();
+                document.getElementById('info-bat').textContent = ${waypoints[idx].battery}%;
+                document.getElementById('progress-bar').style.width = (progress * 100) + '%';
+            }
+            controls.update();
+            renderer.render(scene, camera);
+        }
+    </script>
+</body>
+</html>
