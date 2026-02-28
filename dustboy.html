@@ -316,10 +316,17 @@
         client.on('message', (topic, message) => {
             try {
                 const data = JSON.parse(message.toString());
-                const sensorId = data.nickname || data.id;
-                document.getElementById('mqtt-stream').innerText = topic.split('/').pop();
+                const topicParts = topic.split('/');
+                const sensorId = data.nickname || data.db_nickname || data.id || topicParts[topicParts.length - 2];
+
+                document.getElementById('mqtt-stream').innerText = topicParts.pop();
+                document.getElementById('mqtt-stream').style.color = '#22c55e';
+                setTimeout(() => { document.getElementById('mqtt-stream').style.color = '#94a3b8'; }, 500);
+
                 updateSensor(sensorId, data);
-            } catch (e) { console.error("Parse error", e); }
+            } catch (e) {
+                console.error("Parse error", e, message.toString());
+            }
         });
 
         function getColor(pm25) {
@@ -329,7 +336,19 @@
             return 0xef4444; // Emergency
         }
 
+        function getValue(obj, keys) {
+            for (let key of keys) {
+                if (obj[key] !== undefined && obj[key] !== null) return obj[key];
+            }
+            return 0;
+        }
+
         function updateSensor(id, data) {
+            const pm25 = parseFloat(getValue(data, ['pm25', 'db_pm25', 'pm2_5'])) || 0;
+            const pm10 = parseFloat(getValue(data, ['pm10', 'db_pm10'])) || 0;
+            const temp = parseFloat(getValue(data, ['temp', 'db_temp', 'temperature'])) || 0;
+            const hum = parseFloat(getValue(data, ['hum', 'db_hum', 'humidity'])) || 0;
+
             if (!sensors.has(id)) {
                 // Create New 3D Node
                 const group = new THREE.Group();
@@ -355,13 +374,12 @@
             }
 
             const sensor = sensors.get(id);
-            sensor.data = data;
-            const pm25 = parseFloat(data.pm25) || 0;
+            sensor.data = { ...data, pm25, pm10, temp, hum }; // Store normalized data
             const targetColor = getColor(pm25);
 
             // Animate scale and color based on PM2.5
-            sensor.mesh.scale.set(1, 1 + (pm25 / 100), 1);
-            sensor.mesh.position.y = 10 * (1 + (pm25 / 100));
+            sensor.mesh.scale.set(1, 1 + (pm25 / 50), 1); // Increased sensitivity
+            sensor.mesh.position.y = 10 * (1 + (pm25 / 50));
             sensor.mesh.material.color.setHex(targetColor);
             sensor.mesh.material.emissive.setHex(targetColor);
             sensor.ring.material.color.setHex(targetColor);
