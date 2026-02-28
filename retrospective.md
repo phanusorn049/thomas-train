@@ -40,8 +40,8 @@ The afternoon was dedicated to the DustBoy Dashboard. Instead of a flat table, w
 
 ## Honest Feedback
 - **Friction 1: System Encoding**: PowerShell's default encoding on Windows caused major headaches with Thai characters during `git push`.
-- **Friction 2: Pages Caching**: GitHub Pages' aggressive caching meant we had to use "v.Final" hard-coded tags just to verify our changes were live.
-- **Friction 3: Artifact Permissions**: Trying to `write_to_file` directly to internal artifact paths often hit permission errors, requiring a "Desktop-first, then Copy" maneuver.
+- **Friction 2: Broker URL Config**: A manual edit incorrectly pointed the MQTT `brokerUrl` to a web page instead of the WSS endpoint, causing a data silent-fail.
+- **Friction 3: Pages Caching**: GitHub Pages' aggressive caching meant we had to use "v.Final" hard-coded tags just to verify our changes were live.
 
 ## Lessons Learned
 - Always specify `-Encoding utf8` when using `Set-Content` in PowerShell for non-English projects.
